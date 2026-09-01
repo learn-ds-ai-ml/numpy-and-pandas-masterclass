@@ -99,7 +99,7 @@ git clone git@github.com-personal:personal_username/my-cool-project.git
 
 ---
 
-## 2.4.2: When cloning a Work repo
+#### 2.4.2: When cloning a Work repo
 
 Change `github.com` to your work nickname:
 
