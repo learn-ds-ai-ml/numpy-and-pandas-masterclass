@@ -1,3 +1,38 @@
+# 📋 Cheat Sheet: Fixing GitHub SSH Access in Docker
+
+## The Problem
+
+The Jupyter container runs as user `jovyan` (UID `1000`) and cannot read your host’s restricted `~/.ssh` folder, or it repeatedly asks you for an unknown key passphrase.
+
+---
+
+## 🔍 Step 1: Find the Right SSH Key on Your Host
+
+If you have multiple keys, run this on your **host terminal** to find which one is linked to GitHub:
+
+```bash
+# You will see a list of files. Look for pairs of files with names like these:
+# - Modern key type: `id_ed25519` (private key) and `id_ed25519.pub` (public key)
+# - Older key type: `id_rsa` (private key) and `id_rsa.pub` (public key)
+# The file without `.pub` at the end is your private key name (e.g., `id_ed25519` or `id_rsa`). That is the name you use when setting up the SSH agent.
+ls -la ~/.ssh
+
+# Test a specific key (replace 'id_ed25519' with your key file name)
+ssh -i ~/.ssh/id_ed25519 -T git@github.com
+```
+
+- **Success:** Shows your GitHub username.
+- **Failure:** `Says Permission denied (publickey)`.
+
+_Alternatively, match the fingerprint output of `for key in ~/.ssh/*.pub; do ssh-keygen -lf "$key"; done` with the keys listed in your **GitHub Settings -> SSH and GPG keys**._
+
+## 🛠️ Step 2: The Best Fix (SSH Agent Forwarding)
+
+Instead of copying files or changing host permissions, let your host machine handle the key unlocking and securely "share" the connection with Docker.
+
+### 1. Update `docker-compose.yml`
+
+```yml
 services:
   jupyter-scipy:
     # Jupyter's SciPy notebook image.
@@ -191,3 +226,57 @@ services:
       # modify the host's copy.
       #
       - ~/.ssh/known_hosts:/home/jovyan/.ssh/known_hosts:ro
+```
+
+### 2. Start the Agent & Run (On Host Terminal)
+
+```bash
+# Stop old container
+docker compose down
+
+# Start host SSH agent and add your verified key (unlocks it once)
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/YOUR_KEY_NAME # e.g., id_ed25519 or id_rsa
+
+# Boot up container
+docker compose up
+```
+
+#### 2.1: How to check how many keys agent is holding?
+
+```bash
+ssh-add -l
+```
+
+---
+
+## 🆕 Alternative: Generate a Fresh Key Inside Jupyter
+
+If you completely forgot your host key's passphrase, just make a brand new, passwordless key inside the container.
+
+1. Open **Terminal** inside JupyterLab (**File -> New -> Terminal**).
+2. Run the generator (press **Enter** for all prompts to leave the passphrase blank):
+
+   ```bash
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   ```
+
+3. Print and copy the new public key:
+
+   ```bash
+   cat ~/.ssh/id_ed25519.pub
+   ```
+
+4. Paste this full string into **GitHub -> Settings -> SSH and GPG Keys -> New SSH Key**.
+
+---
+
+## 🧪 Step 3: Verify the Connection
+
+Inside your **Jupyter Lab Terminal**, test that everything works by running:
+
+```bash
+ssh -T git@github.com
+```
+
+**🎯 Expected Success Message:** _"Hi username! You've successfully authenticated, but GitHub does not provide shell access."_
