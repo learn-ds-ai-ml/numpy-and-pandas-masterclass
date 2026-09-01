@@ -1,0 +1,7 @@
+services:
+  jupyter-sciypy:
+    image: quay.io/jupyter/scipy-notebook:latest
+    ports:
+      - "8889:8888"
+    volumes:
+      - .:/home/jovyan/work
