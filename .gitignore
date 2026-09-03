@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MACOS files
+# don't include macOS metadata system files in the repository
+.DS_Store
